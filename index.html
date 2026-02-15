@@ -243,7 +243,7 @@ function RadioGroup({ options, value, onChange, name }) {
             gap: "8px",
             padding: "10px 18px",
             borderRadius: "10px",
-            border: `2px solid ${value === opt.value ? "#6B8F71" : "#D4C9B0"}`,
+            border: "2px solid " + (value === opt.value ? "#6B8F71" : "#D4C9B0") + "",
             background: value === opt.value ? "#EDF5EE" : "#FEFCF8",
             cursor: "pointer",
             transition: "all 0.2s",
@@ -272,11 +272,11 @@ function InfoCard({ icon, title, children, color = "#6B8F71" }) {
     <div
       style={{
         background: "#FEFCF8",
-        border: `2px solid ${color}22`,
+        border: "2px solid " + (color) + "22",
         borderRadius: "14px",
         padding: "20px",
         marginBottom: "16px",
-        borderRight: `4px solid ${color}`,
+        borderRight: "4px solid " + (color) + "",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
@@ -318,7 +318,7 @@ function CheckItem({ text, checked, onChange }) {
         padding: "12px 16px",
         borderRadius: "10px",
         background: checked ? "#EDF5EE" : "#FEFCF8",
-        border: `1px solid ${checked ? "#6B8F71" : "#E0D8C8"}`,
+        border: "1px solid " + (checked ? "#6B8F71" : "#E0D8C8") + "",
         marginBottom: "8px",
         cursor: "pointer",
         transition: "all 0.2s",
@@ -348,14 +348,72 @@ function CheckItem({ text, checked, onChange }) {
 
 // ===== MAIN APP =====
 function HarelClaimWizard() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({});
-  const [checklist, setChecklist] = useState({});
+  const STORAGE_KEY = "harel_claim_draft";
+
+  // Load saved draft from localStorage
+  const loadDraft = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  };
+
+  const draft = loadDraft();
+  const [currentStep, setCurrentStep] = useState(draft ? draft.currentStep || 0 : 0);
+  const [formData, setFormData] = useState(draft ? draft.formData || {} : {});
+  const [checklist, setChecklist] = useState(draft ? draft.checklist || {} : {});
   const [showAllSteps, setShowAllSteps] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(!!draft);
+  const [showDraftNotice, setShowDraftNotice] = useState(!!draft);
   const contentRef = useRef(null);
 
   const step = STEPS[currentStep];
   const progress = ((currentStep) / (STEPS.length - 1)) * 100;
+
+  // Save draft to localStorage
+  const saveDraft = () => {
+    try {
+      const data = {
+        formData,
+        checklist,
+        currentStep,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Clear draft
+  const clearDraft = () => {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    setFormData({});
+    setChecklist({});
+    setCurrentStep(0);
+    setDraftLoaded(false);
+    setShowDraftNotice(false);
+    setReferralConsent(false);
+    setReferralContactConsent(false);
+    setReferralNotes("");
+    setReferralSent(false);
+    setShowPrivacyPolicy(false);
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  };
+
+  // Auto-save on every change (only if there's actual data)
+  useEffect(() => {
+    const hasFormData = Object.keys(formData).some(k => formData[k] && formData[k].toString().trim());
+    const hasChecklist = Object.keys(checklist).some(k => checklist[k]);
+    if (hasFormData || hasChecklist) {
+      saveDraft();
+    } else {
+      // If everything is empty, remove the draft
+      try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    }
+  }, [formData, checklist, currentStep]);
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -400,6 +458,81 @@ function HarelClaimWizard() {
         >
           מדריך להגשת תביעת סיעוד בהראל
         </h2>
+        <p style={{
+          fontSize: "13px",
+          color: "#8A8A8A",
+          marginBottom: "14px",
+          fontFamily: "'Noto Sans Hebrew', sans-serif",
+        }}>
+          (לחברי קופות החולים כללית, מאוחדת ולאומית. חברי מכבי? הביטוח הסיעודי שלכם בהפניקס.)
+        </p>
+
+        {/* VIDEO SECTION */}
+        <div style={{
+          background: "#F5F0E8",
+          borderRadius: "16px",
+          padding: "16px",
+          marginBottom: "20px",
+          border: "1px solid #E0D8C8",
+        }}>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "10px",
+          }}>
+            <span style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "#3D3D3D",
+              fontFamily: "'Noto Sans Hebrew', sans-serif",
+            }}>
+              🎬 סרטון הסבר קצר
+            </span>
+            <button
+              onClick={() => {
+                const videoEl = document.getElementById("welcome-video-wrap");
+                if (videoEl) videoEl.style.display = "none";
+              }}
+              style={{
+                background: "none",
+                border: "1px solid #D4C9B0",
+                borderRadius: "8px",
+                padding: "4px 12px",
+                fontSize: "12px",
+                color: "#8A8A8A",
+                cursor: "pointer",
+                fontFamily: "'Noto Sans Hebrew', sans-serif",
+                fontWeight: 600,
+              }}
+            >
+              דלג על הסרטון ←
+            </button>
+          </div>
+          <div id="welcome-video-wrap" style={{
+            position: "relative",
+            paddingBottom: "56.25%",
+            height: 0,
+            borderRadius: "12px",
+            overflow: "hidden",
+            background: "#000",
+          }}>
+            <iframe
+              src="https://player.vimeo.com/video/1165074541?badge=0&autopause=0&player_id=0&app_id=58479"
+              frameBorder="0"
+              allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+              }}
+              title="הגשת תביעת סיעוד — סרטון הסבר"
+            />
+          </div>
+        </div>
         <p
           style={{
             fontSize: "16px",
@@ -460,6 +593,50 @@ function HarelClaimWizard() {
         לאחר ההגשה, הראל יפתחו תיק תביעה וייצרו קשר טלפוני תוך ימים ספורים.
       </InfoCard>
 
+      <InfoCard icon="🔍" title="איך בודקים אם יש למטופל/ת ביטוח סיעודי?">
+        לפני שמתחילים, חשוב לוודא שיש פוליסת סיעוד פעילה בהראל. יש שתי דרכים לבדוק:
+        <br /><br />
+        <div style={{
+          background: "#F0F4FF",
+          border: "1px solid #C0D0E8",
+          borderRadius: "10px",
+          padding: "12px 16px",
+          marginBottom: "10px",
+        }}>
+          <strong>1. באזור האישי בהראל:</strong>
+          <br />
+          היכנסו לאזור האישי וברגע שתזדהו תראו את כל הפוליסות הפעילות.
+          <br />
+          <a
+            href="https://www.harel-group.co.il/Pages/login-page/Login.aspx?LoginOriginatingAction=PersonalInfoPage&isshowlogin=true&Source=%2fpersonal-info%2fmy-harel%2fPages%2fclient-view.aspx&Type=PortalOTP"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#3D5A9E", fontWeight: 600, textDecoration: "underline" }}
+          >
+            כניסה לאזור האישי בהראל ←
+          </a>
+        </div>
+        <div style={{
+          background: "#F0F4FF",
+          border: "1px solid #C0D0E8",
+          borderRadius: "10px",
+          padding: "12px 16px",
+        }}>
+          <strong>2. דרך קופת החולים:</strong>
+          <br />
+          חלק מפוליסות הסיעוד נרכשו דרך קופת החולים. אפשר לבדוק בטלפון <strong style={{ direction: "ltr", display: "inline-block" }}>*2700</strong> (כללית) או באזור האישי במושלם:
+          <br />
+          <a
+            href="https://mushlam.clalit.co.il/he/gold/siudi/Pages/siudi_info.aspx"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#3D5A9E", fontWeight: 600, textDecoration: "underline" }}
+          >
+            בדיקת ביטוח סיעודי במושלם כללית ←
+          </a>
+        </div>
+      </InfoCard>
+
       <InfoCard icon="⚠️" title="חשוב לדעת" color="#C75B3A">
         הגשת תביעה לא עוצרת את מרוץ ההתיישנות. תקופת ההתיישנות היא 3-5 שנים ממקרה הביטוח, תלוי במועד תחילת הפוליסה.
         אם אתם מתקרבים לגבול - כדאי להתייעץ עם עו"ד.
@@ -497,7 +674,7 @@ function HarelClaimWizard() {
             fontFamily: "'Noto Sans Hebrew', sans-serif",
           }}
         >
-          <strong>🔐 הנתונים שלכם נשמרים אך ורק אצלכם.</strong> כל מה שתמלאו בכלי הזה נשמר בדפדפן שלכם בלבד ואינו נשלח, נאסף או מאוחסן בשום שרת. ברגע שתסגרו את הדף — המידע נמחק. אף גורם אחר אינו חשוף למידע שתזינו.
+          <strong>🔐 הנתונים שלכם נשמרים אך ורק אצלכם.</strong> כל מה שתמלאו בכלי הזה נשמר בדפדפן שלכם בלבד (localStorage) ואינו נשלח, נאסף או מאוחסן בשום שרת. אין לנו גישה למידע שהזנתם. הטיוטה נשמרת אוטומטית כדי שתוכלו להמשיך בזמן אחר — ותוכלו למחוק אותה בכל עת בלחיצה על "נקה טופס".
           <br /><br />
           <strong>📝 אין חובה למלא שום פרט.</strong> הכלי נועד לסייע לכם להתארגן לקראת מילוי טופס התביעה הרשמי של הראל. כל שדה הוא אופציונלי ומשמש כטיוטה אישית בלבד.
           <br /><br />
@@ -529,7 +706,7 @@ function HarelClaimWizard() {
         "צילום המחאה מבוטלת או אישור ניהול חשבון בנק",
         "מספר פוליסת הביטוח (אפשר לברר אצל סוכן הביטוח)",
       ].map((t, i) => (
-        <CheckItem key={`basic-${i}`} text={t} checked={checklist[`basic-${i}`] || false} onChange={(v) => updateCheck(`basic-${i}`, v)} />
+        <CheckItem key={"basic-" + (i) + ""} text={t} checked={checklist["basic-" + (i) + ""] || false} onChange={(v) => updateCheck("basic-" + (i) + "", v)} />
       ))}
 
       <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#6B8F71", marginBottom: "12px", marginTop: "24px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
@@ -542,7 +719,7 @@ function HarelClaimWizard() {
         "אבחונים קוגניטיביים (אם רלוונטי)",
         "חוו\"ד אורולוג/גסטרו (במקרה של אי שליטה על סוגרים)",
       ].map((t, i) => (
-        <CheckItem key={`med-${i}`} text={t} checked={checklist[`med-${i}`] || false} onChange={(v) => updateCheck(`med-${i}`, v)} />
+        <CheckItem key={"med-" + (i) + ""} text={t} checked={checklist["med-" + (i) + ""] || false} onChange={(v) => updateCheck("med-" + (i) + "", v)} />
       ))}
 
       <h3 style={{ fontSize: "16px", fontWeight: 700, color: "#6B8F71", marginBottom: "12px", marginTop: "24px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
@@ -553,7 +730,7 @@ function HarelClaimWizard() {
         "אישור מטפל סיעודי (עובד זר) או תצהיר בן משפחה מטפל",
         "אישור ביטוח לאומי על הערכת תלות (אם בוצעה)",
       ].map((t, i) => (
-        <CheckItem key={`other-${i}`} text={t} checked={checklist[`other-${i}`] || false} onChange={(v) => updateCheck(`other-${i}`, v)} />
+        <CheckItem key={"other-" + (i) + ""} text={t} checked={checklist["other-" + (i) + ""] || false} onChange={(v) => updateCheck("other-" + (i) + "", v)} />
       ))}
 
       <InfoCard icon="💡" title="טיפ חשוב" color="#D4A843">
@@ -581,6 +758,9 @@ function HarelClaimWizard() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
         <Field label="מספר ת.ז." required tooltip="9 ספרות. ניתן למצוא בתעודת הזהות">
           <TextInput value={formData.idNumber} onChange={(v) => updateField("idNumber", v)} placeholder="000000000" dir="ltr" />
+          <div style={{ fontSize: "12px", color: "#B8860B", marginTop: "4px", lineHeight: "1.5", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+            💡 שימו לב: בנוסף למספר, יש להכין <strong>צילום תעודת זהות כולל ספח</strong> לצירוף לתביעה
+          </div>
         </Field>
         <Field label="תאריך לידה" required>
           <TextInput value={formData.birthDate} onChange={(v) => updateField("birthDate", v)} type="date" dir="ltr" />
@@ -783,7 +963,7 @@ function HarelClaimWizard() {
                 gap: "6px",
                 padding: "14px 16px",
                 borderRadius: "12px",
-                border: `2px solid ${formData.claimType === opt.value ? "#6B8F71" : "#D4C9B0"}`,
+                border: "2px solid " + (formData.claimType === opt.value ? "#6B8F71" : "#D4C9B0") + "",
                 background: formData.claimType === opt.value ? "#EDF5EE" : "#FEFCF8",
                 cursor: "pointer",
                 transition: "all 0.2s",
@@ -905,8 +1085,8 @@ function HarelClaimWizard() {
           {[0, 1, 2].map((i) => (
             <div key={i} style={{ marginBottom: "8px" }}>
               <TextInput
-                value={formData[`memoryClinic${i}`]}
-                onChange={(v) => updateField(`memoryClinic${i}`, v)}
+                value={formData["memoryClinic" + (i) + ""]}
+                onChange={(v) => updateField("memoryClinic" + (i) + "", v)}
                 placeholder={
                   i === 0
                     ? 'למשל: מרפאת זיכרון, בי"ח שיבא'
@@ -943,12 +1123,12 @@ function HarelClaimWizard() {
       {[0, 1].map((i) => (
         <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
           <Field label="שם הרופא/ה">
-            <TextInput value={formData[`specialist${i}Name`]} onChange={(v) => updateField(`specialist${i}Name`, v)} />
+            <TextInput value={formData["specialist" + (i) + "Name"]} onChange={(v) => updateField("specialist" + (i) + "Name", v)} />
           </Field>
           <Field label="תחום התמחות">
             <TextInput
-              value={formData[`specialist${i}Field`]}
-              onChange={(v) => updateField(`specialist${i}Field`, v)}
+              value={formData["specialist" + (i) + "Field"]}
+              onChange={(v) => updateField("specialist" + (i) + "Field", v)}
               placeholder={
                 (formData.claimType === "cognitive" || formData.claimType === "both")
                   ? "גריאטר, נוירולוג, פסיכוגריאטר..."
@@ -957,7 +1137,7 @@ function HarelClaimWizard() {
             />
           </Field>
           <Field label="שם המרפאה">
-            <TextInput value={formData[`specialist${i}Clinic`]} onChange={(v) => updateField(`specialist${i}Clinic`, v)} />
+            <TextInput value={formData["specialist" + (i) + "Clinic"]} onChange={(v) => updateField("specialist" + (i) + "Clinic", v)} />
           </Field>
         </div>
       ))}
@@ -969,13 +1149,13 @@ function HarelClaimWizard() {
       {[0, 1].map((i) => (
         <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
           <Field label="בית חולים">
-            <TextInput value={formData[`hospital${i}`]} onChange={(v) => updateField(`hospital${i}`, v)} />
+            <TextInput value={formData["hospital" + (i) + ""]} onChange={(v) => updateField("hospital" + (i) + "", v)} />
           </Field>
           <Field label="מחלקה / מרפאה">
-            <TextInput value={formData[`hospitalDept${i}`]} onChange={(v) => updateField(`hospitalDept${i}`, v)} />
+            <TextInput value={formData["hospitalDept" + (i) + ""]} onChange={(v) => updateField("hospitalDept" + (i) + "", v)} />
           </Field>
           <Field label="תאריכי אשפוז">
-            <TextInput value={formData[`hospitalDates${i}`]} onChange={(v) => updateField(`hospitalDates${i}`, v)} placeholder="מ... עד..." />
+            <TextInput value={formData["hospitalDates" + (i) + ""]} onChange={(v) => updateField("hospitalDates" + (i) + "", v)} placeholder="מ... עד..." />
           </Field>
         </div>
       ))}
@@ -1086,12 +1266,17 @@ function HarelClaimWizard() {
 
   const [showReport, setShowReport] = useState(false);
   const reportRef = useRef(null);
+  const [referralConsent, setReferralConsent] = useState(false);
+  const [referralContactConsent, setReferralContactConsent] = useState(false);
+  const [referralNotes, setReferralNotes] = useState("");
+  const [referralSent, setReferralSent] = useState(false);
+  const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
 
   const generateReportData = () => {
     const filled = (field) => formData[field] && formData[field].toString().trim();
     const today = new Date().toLocaleDateString("he-IL");
     const insuredName = filled("firstName") && filled("lastName")
-      ? `${formData.firstName} ${formData.lastName}`
+      ? "" + (formData.firstName) + " " + (formData.lastName) + ""
       : "לא צוין";
 
     const formSections = [
@@ -1099,7 +1284,7 @@ function HarelClaimWizard() {
         title: "פרטים אישיים של המבוטח/ת",
         icon: "👤",
         items: [
-          { label: "שם מלא", value: filled("firstName") && filled("lastName") ? `${formData.firstName} ${formData.lastName}` : null },
+          { label: "שם מלא", value: filled("firstName") && filled("lastName") ? "" + (formData.firstName) + " " + (formData.lastName) + "" : null },
           { label: "ת.ז.", value: filled("idNumber") ? formData.idNumber : null },
           { label: "תאריך לידה", value: filled("birthDate") ? formData.birthDate : null },
           { label: "טלפון נייד", value: filled("mobile") ? formData.mobile : null },
@@ -1111,7 +1296,7 @@ function HarelClaimWizard() {
         title: "איש קשר לתביעה",
         icon: "📞",
         items: [
-          { label: "שם מלא", value: filled("contactFirstName") && filled("contactLastName") ? `${formData.contactFirstName} ${formData.contactLastName}` : null },
+          { label: "שם מלא", value: filled("contactFirstName") && filled("contactLastName") ? "" + (formData.contactFirstName) + " " + (formData.contactLastName) + "" : null },
           { label: "ת.ז.", value: filled("contactId") ? formData.contactId : null },
           { label: "קרבה", value: filled("contactRelation") ? formData.contactRelation : null },
           { label: "טלפון נייד", value: filled("contactMobile") ? formData.contactMobile : null },
@@ -1124,7 +1309,7 @@ function HarelClaimWizard() {
         items: [
           { label: "סוג מגורים", value: formData.residenceType === "home" ? "בית" : formData.residenceType === "assisted" ? "דיור מוגן / בית אבות" : formData.residenceType === "nursing" ? "מוסד סיעודי" : null },
           ...(formData.residenceType === "home" ? [
-            { label: "כתובת", value: filled("resStreet") ? `${formData.resStreet} ${formData.resHouseNum || ""}, ${formData.resCity || ""}` : null },
+            { label: "כתובת", value: filled("resStreet") ? "" + (formData.resStreet) + " " + (formData.resHouseNum || "") + ", " + (formData.resCity || "") + "" : null },
           ] : []),
           ...((formData.residenceType === "assisted" || formData.residenceType === "nursing") ? [
             { label: "שם מוסד", value: filled("institutionName") ? formData.institutionName : null },
@@ -1153,7 +1338,7 @@ function HarelClaimWizard() {
         icon: "🏦",
         items: [
           { label: "בנק", value: filled("bankName") ? formData.bankName : null },
-          { label: "סניף", value: filled("branchNumber") ? `${formData.branchName || ""} (${formData.branchNumber})` : null },
+          { label: "סניף", value: filled("branchNumber") ? "" + (formData.branchName || "") + " (" + (formData.branchNumber) + ")" : null },
           { label: "מספר חשבון", value: filled("accountNumber") ? formData.accountNumber : null },
         ],
       },
@@ -1215,97 +1400,92 @@ function HarelClaimWizard() {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    const html = `<!DOCTYPE html>
-<html dir="rtl" lang="he">
-<head>
-<meta charset="UTF-8">
-<title>דוח מוכנות - תביעת סיעוד ${report.insuredName}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Noto Sans Hebrew', sans-serif; color: #3D3D3D; padding: 40px; max-width: 800px; margin: 0 auto; font-size: 14px; line-height: 1.7; }
-  h1 { font-size: 22px; color: #3D3D3D; margin-bottom: 4px; }
-  h2 { font-size: 17px; color: #6B8F71; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #E8E0D0; }
-  h3 { font-size: 15px; color: #5A7D60; margin: 20px 0 10px; }
-  .subtitle { color: #8A8A8A; font-size: 13px; margin-bottom: 24px; }
-  .header-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
-  .section { margin-bottom: 8px; }
-  .row { display: flex; padding: 6px 0; border-bottom: 1px solid #F0EBE0; }
-  .row-label { font-weight: 600; min-width: 140px; color: #5A5A5A; }
-  .row-value { color: #3D3D3D; }
-  .row-missing { color: #C75B3A; font-style: italic; }
-  .status-box { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }
-  .status-ok { background: #EDF5EE; color: #4A7A50; }
-  .status-missing { background: #FEF3F0; color: #C75B3A; }
-  .doc-item { padding: 6px 0; border-bottom: 1px solid #F0EBE0; display: flex; align-items: flex-start; gap: 8px; }
-  .doc-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
-  .doc-tip { font-size: 12px; color: #8A8A8A; margin-top: 2px; }
-  .todo-box { background: #FEF8F0; border: 2px solid #E8D5B0; border-radius: 12px; padding: 20px; margin: 24px 0; }
-  .todo-box h3 { color: #C08A30; margin-top: 0; }
-  .summary-box { background: #EDF5EE; border: 2px solid #B8D4BC; border-radius: 12px; padding: 20px; margin: 24px 0; }
-  .summary-box h3 { color: #4A7A50; margin-top: 0; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #E8E0D0; font-size: 12px; color: #AAAAAA; text-align: center; }
-  @media print { body { padding: 20px; } .no-print { display: none; } }
-</style>
-</head>
-<body>
-<div class="header-line">
-  <h1>📋 דוח מוכנות — תביעת סיעוד</h1>
-</div>
-<div class="subtitle">עבור: <strong>${report.insuredName}</strong> &nbsp;|&nbsp; תאריך הפקה: ${report.today}</div>
+    var sectionHtml = report.formSections.map(function(section) {
+      var filledItems = section.items.filter(function(i) { return i.value; });
+      var missingItems = section.items.filter(function(i) { return !i.value; });
+      var allFilled = missingItems.length === 0 && filledItems.length > 0;
+      var statusClass = allFilled ? "status-ok" : "status-missing";
+      var statusText = allFilled ? "✓ הושלם" : "⚠ חסר מידע";
+      var rows = filledItems.map(function(i) {
+        return "<div class=\"row\"><span class=\"row-label\">" + i.label + ":</span><span class=\"row-value\">" + i.value + "</span></div>";
+      }).join("");
+      rows += missingItems.map(function(i) {
+        return "<div class=\"row\"><span class=\"row-label\">" + i.label + ":</span><span class=\"row-missing\">לא מולא — יש להשלים בטופס</span></div>";
+      }).join("");
+      return "<h2>" + section.icon + " " + section.title + " <span class=\"status-box " + statusClass + "\">" + statusText + "</span></h2><div class=\"section\">" + rows + "</div>";
+    }).join("");
 
-<button class="no-print" onclick="window.print()" style="background: #6B8F71; color: white; border: none; padding: 10px 28px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: 'Noto Sans Hebrew', sans-serif; margin-bottom: 20px;">🖨️ הדפסה</button>
+    var docsReadyHtml = report.docsReady.length > 0
+      ? report.docsReady.map(function(d) { return "<div class=\"doc-item\"><span class=\"doc-icon\">✅</span><span>" + d + "</span></div>"; }).join("")
+      : "<div style=\"color: #8A8A8A; padding: 8px 0;\">לא סומנו מסמכים</div>";
 
-${report.formSections.map(section => {
-  const filledItems = section.items.filter(i => i.value);
-  const missingItems = section.items.filter(i => !i.value);
-  const allFilled = missingItems.length === 0 && filledItems.length > 0;
-  return `
-<h2>${section.icon} ${section.title} <span class="status-box ${allFilled ? 'status-ok' : 'status-missing'}">${allFilled ? '✓ הושלם' : '⚠ חסר מידע'}</span></h2>
-<div class="section">
-${filledItems.map(i => `<div class="row"><span class="row-label">${i.label}:</span><span class="row-value">${i.value}</span></div>`).join("")}
-${missingItems.map(i => `<div class="row"><span class="row-label">${i.label}:</span><span class="row-missing">לא מולא — יש להשלים בטופס</span></div>`).join("")}
-</div>`;
-}).join("")}
+    var docsMissingHtml = report.docsMissing.length > 0
+      ? report.docsMissing.map(function(d) { return "<div class=\"doc-item\"><span class=\"doc-icon\">☐</span><span>" + d + "</span></div>"; }).join("")
+      : "<div style=\"color: #6B8F71; padding: 8px 0;\">מצוין! כל המסמכים ברשותך ✓</div>";
 
-<div class="summary-box">
-<h3>✅ מסמכים שכבר ברשותי (${report.docsReady.length})</h3>
-${report.docsReady.length > 0
-  ? report.docsReady.map(d => `<div class="doc-item"><span class="doc-icon">✅</span><span>${d}</span></div>`).join("")
-  : '<div style="color: #8A8A8A; padding: 8px 0;">לא סומנו מסמכים</div>'}
-</div>
+    var alwaysReqHtml = report.alwaysRequired.map(function(r) {
+      var tip = r.tip ? "<div class=\"doc-tip\">" + r.tip + "</div>" : "";
+      return "<div class=\"doc-item\"><span class=\"doc-icon\">☐</span><div><div><strong>" + r.text + "</strong></div>" + tip + "</div></div>";
+    }).join("");
 
-<div class="todo-box">
-<h3>⚠️ מסמכים שעדיין צריך להשיג (${report.docsMissing.length})</h3>
-${report.docsMissing.length > 0
-  ? report.docsMissing.map(d => `<div class="doc-item"><span class="doc-icon">☐</span><span>${d}</span></div>`).join("")
-  : '<div style="color: #6B8F71; padding: 8px 0;">מצוין! כל המסמכים ברשותך ✓</div>'}
-</div>
-
-<h2>📎 רשימת צירופים חובה להגשה</h2>
-<p style="color: #5A5A5A; margin-bottom: 12px;">אלה המסמכים שחייבים להיות מצורפים לטופס התביעה:</p>
-${report.alwaysRequired.map(r => `
-<div class="doc-item">
-  <span class="doc-icon">☐</span>
-  <div>
-    <div><strong>${r.text}</strong></div>
-    ${r.tip ? `<div class="doc-tip">${r.tip}</div>` : ''}
-  </div>
-</div>`).join("")}
-
-<h2>📬 דרכי שליחה</h2>
-<div class="section">
-<div class="row"><span class="row-label">דוא"ל:</span><span class="row-value">tvsiud@harel-ins.co.il</span></div>
-<div class="row"><span class="row-label">פקס:</span><span class="row-value">03-7348597</span></div>
-<div class="row"><span class="row-label">מסרון:</span><span class="row-value">052-3240345</span></div>
-<div class="row"><span class="row-label">דואר:</span><span class="row-value">הראל חברה לביטוח, מח' תביעות סיעוד, אבא הלל 3, ת.ד. 10952, רמת גן 5252202</span></div>
-<div class="row"><span class="row-label">בדיקת קבלה:</span><span class="row-value">1-700-702-870 (24 שעות אחרי שליחה)</span></div>
-</div>
-
-<div class="footer">
-  דוח זה הופק באמצעות כלי הליווי להגשת תביעת סיעוד &nbsp;|&nbsp; אינו מהווה טופס רשמי של הראל &nbsp;|&nbsp; ${report.today}
-</div>
-</body></html>`;
+    var html = "<!DOCTYPE html>" +
+"<html dir=\"rtl\" lang=\"he\">" +
+"<head>" +
+"<meta charset=\"UTF-8\">" +
+"<title>דוח מוכנות - תביעת סיעוד " + report.insuredName + "</title>" +
+"<link href=\"https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;600;700;800&display=swap\" rel=\"stylesheet\">" +
+"<style>" +
+"* { box-sizing: border-box; margin: 0; padding: 0; }" +
+"body { font-family: Noto Sans Hebrew, sans-serif; color: #3D3D3D; padding: 40px; max-width: 800px; margin: 0 auto; font-size: 14px; line-height: 1.7; }" +
+"h1 { font-size: 22px; color: #3D3D3D; margin-bottom: 4px; }" +
+"h2 { font-size: 17px; color: #6B8F71; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #E8E0D0; }" +
+"h3 { font-size: 15px; color: #5A7D60; margin: 20px 0 10px; }" +
+".subtitle { color: #8A8A8A; font-size: 13px; margin-bottom: 24px; }" +
+".header-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }" +
+".section { margin-bottom: 8px; }" +
+".row { display: flex; padding: 6px 0; border-bottom: 1px solid #F0EBE0; }" +
+".row-label { font-weight: 600; min-width: 140px; color: #5A5A5A; }" +
+".row-value { color: #3D3D3D; }" +
+".row-missing { color: #C75B3A; font-style: italic; }" +
+".status-box { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; }" +
+".status-ok { background: #EDF5EE; color: #4A7A50; }" +
+".status-missing { background: #FEF3F0; color: #C75B3A; }" +
+".doc-item { padding: 6px 0; border-bottom: 1px solid #F0EBE0; display: flex; align-items: flex-start; gap: 8px; }" +
+".doc-icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }" +
+".doc-tip { font-size: 12px; color: #8A8A8A; margin-top: 2px; }" +
+".todo-box { background: #FEF8F0; border: 2px solid #E8D5B0; border-radius: 12px; padding: 20px; margin: 24px 0; }" +
+".todo-box h3 { color: #C08A30; margin-top: 0; }" +
+".summary-box { background: #EDF5EE; border: 2px solid #B8D4BC; border-radius: 12px; padding: 20px; margin: 24px 0; }" +
+".summary-box h3 { color: #4A7A50; margin-top: 0; }" +
+".footer { margin-top: 40px; padding-top: 16px; border-top: 2px solid #E8E0D0; font-size: 12px; color: #AAAAAA; text-align: center; }" +
+"@media print { body { padding: 20px; } .no-print { display: none; } }" +
+"</style>" +
+"</head>" +
+"<body>" +
+"<div class=\"header-line\"><h1>📋 דוח מוכנות — תביעת סיעוד</h1></div>" +
+"<div class=\"subtitle\">עבור: <strong>" + report.insuredName + "</strong> &nbsp;|&nbsp; תאריך הפקה: " + report.today + "</div>" +
+"<button class=\"no-print\" onclick=\"window.print()\" style=\"background: #6B8F71; color: white; border: none; padding: 10px 28px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: Noto Sans Hebrew, sans-serif; margin-bottom: 20px;\">🖨️ הדפסה</button>" +
+sectionHtml +
+"<div class=\"summary-box\"><h3>✅ מסמכים שכבר ברשותי (" + report.docsReady.length + ")</h3>" + docsReadyHtml + "</div>" +
+"<div class=\"todo-box\"><h3>⚠️ מסמכים שעדיין צריך להשיג (" + report.docsMissing.length + ")</h3>" + docsMissingHtml + "</div>" +
+"<h2>📎 רשימת צירופים חובה להגשה</h2>" +
+"<p style=\"color: #5A5A5A; margin-bottom: 12px;\">אלה המסמכים שחייבים להיות מצורפים לטופס התביעה:</p>" +
+alwaysReqHtml +
+"<h2>📬 דרכי שליחה</h2>" +
+"<div style=\"background:#E8F5EA;border:2px solid #6B8F71;border-radius:10px;padding:12px 16px;margin-bottom:14px;\">" +
+"<strong style=\"color:#3D7A42;\">💻 הגשת תביעת סיעוד מקוונת לחברת הראל (מומלץ!):</strong><br/>" +
+"<a href=\"https://tofes101.co.il/forms/harel-long-term-care/submit/\" target=\"_blank\" style=\"color:#3D7A42;font-weight:600;\">https://tofes101.co.il/forms/harel-long-term-care/submit/</a><br/>" +
+"<span style=\"font-size:12px;color:#6A6A6A;\">ממלאים פרטים ומעלים מסמכים ישירות מהמחשב או הנייד</span>" +
+"</div>" +
+"<div class=\"section\">" +
+"<div class=\"row\"><span class=\"row-label\">דואל:</span><span class=\"row-value\">tvsiud@harel-ins.co.il</span></div>" +
+"<div class=\"row\"><span class=\"row-label\">פקס:</span><span class=\"row-value\">03-7348597</span></div>" +
+"<div class=\"row\"><span class=\"row-label\">מסרון:</span><span class=\"row-value\">052-3240345</span></div>" +
+"<div class=\"row\"><span class=\"row-label\">דואר:</span><span class=\"row-value\">הראל חברה לביטוח, מח תביעות סיעוד, אבא הלל 3, ת.ד. 10952, רמת גן 5252202</span></div>" +
+"<div class=\"row\"><span class=\"row-label\">בדיקת קבלה:</span><span class=\"row-value\">1-700-702-870 (24 שעות אחרי שליחה)</span></div>" +
+"</div>" +
+"<div class=\"footer\">דוח זה הופק באמצעות כלי הליווי להגשת תביעת סיעוד &nbsp;|&nbsp; אינו מהווה טופס רשמי של הראל &nbsp;|&nbsp; " + report.today + "</div>" +
+"</body></html>";
 
     printWindow.document.write(html);
     printWindow.document.close();
@@ -1351,7 +1531,7 @@ ${report.alwaysRequired.map(r => `
                 background: allOk ? "#EDF5EE" : "#FEF3F0",
                 borderRadius: "10px",
                 marginBottom: "8px",
-                border: `1px solid ${allOk ? "#6B8F71" : "#E8A090"}`,
+                border: "1px solid " + (allOk ? "#6B8F71" : "#E8A090") + "",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -1361,7 +1541,7 @@ ${report.alwaysRequired.map(r => `
                 </span>
               </div>
               <span style={{ fontSize: "12px", color: allOk ? "#6B8F71" : "#C75B3A", fontWeight: 600 }}>
-                {allOk ? "הושלם" : `${filledCount}/${total} שדות`}
+                {allOk ? "הושלם" : "" + (filledCount) + "/" + (total) + " שדות"}
               </span>
             </div>
           );
@@ -1380,7 +1560,7 @@ ${report.alwaysRequired.map(r => `
           </div>
           <div style={{ background: "#E8E0D0", borderRadius: "4px", height: "8px", overflow: "hidden" }}>
             <div style={{
-              width: `${totalDocs > 0 ? (totalChecked / totalDocs) * 100 : 0}%`,
+              width: "" + (totalDocs > 0 ? (totalChecked / totalDocs) * 100 : 0) + "%",
               height: "100%",
               background: totalChecked === totalDocs ? "#6B8F71" : "linear-gradient(90deg, #D4A843, #E8C560)",
               borderRadius: "4px",
@@ -1390,7 +1570,7 @@ ${report.alwaysRequired.map(r => `
         </div>
 
         {report.docsMissing.length > 0 && (
-          <InfoCard icon="📌" title={`עוד ${report.docsMissing.length} מסמכים להשיג`} color="#C75B3A">
+          <InfoCard icon="📌" title={"עוד " + (report.docsMissing.length) + " מסמכים להשיג"} color="#C75B3A">
             {report.docsMissing.map((d, i) => (
               <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }}>
                 <span>☐</span>
@@ -1401,7 +1581,7 @@ ${report.alwaysRequired.map(r => `
         )}
 
         {report.docsReady.length > 0 && (
-          <InfoCard icon="✅" title={`${report.docsReady.length} מסמכים מוכנים`} color="#6B8F71">
+          <InfoCard icon="✅" title={"" + (report.docsReady.length) + " מסמכים מוכנים"} color="#6B8F71">
             {report.docsReady.map((d, i) => (
               <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "4px" }}>
                 <span>✓</span>
@@ -1453,7 +1633,16 @@ ${report.alwaysRequired.map(r => `
 
         {/* SENDING INFO */}
         <InfoCard icon="📬" title="איך שולחים?" color="#6B8F71">
-          <strong>אחרי שתדפיסו, תחתמו ותצרפו את הנספחים</strong>, אפשר לשלוח ב:
+          <strong>שימו לב:</strong> הדוח האישי שהפקתם כאן הוא <strong>לשימושכם בלבד</strong> — הוא לא נשלח להראל.
+          <br />
+          מה שנשלח להראל הם <strong>טפסי התביעה המקוריים</strong> של הראל (או של חברת ביטוח אחרת), שמולאו ידנית, נחתמו וצורפו אליהם כל הנספחים הנדרשים.
+          <br /><br />
+          <strong>לאחר שמילאתם את <a
+            href="https://www.harel-group.co.il/Insurance/long-term-care/claim/DocLib/%D7%98%D7%95%D7%A4%D7%A1%20%D7%94%D7%92%D7%A9%D7%AA%20%D7%AA%D7%91%D7%99%D7%A2%D7%94%20-%20%D7%91%D7%99%D7%98%D7%95%D7%97%20%D7%A1%D7%99%D7%A2%D7%95%D7%93%D7%99.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "#3D7A42", textDecoration: "underline" }}
+          >טפסי התביעה המקוריים של הראל</a>, חתמתם וצירפתם את הנספחים</strong> — אפשר לשלוח לכתובות הבאות (מומלץ בדואר רשום!):
           <br /><br />
           ✉️ <strong>מייל:</strong> tvsiud@harel-ins.co.il
           <br />
@@ -1461,9 +1650,37 @@ ${report.alwaysRequired.map(r => `
           <br />
           📱 <strong>מסרון:</strong> 052-3240345
           <br />
-          📮 <strong>דואר:</strong> הראל חברה לביטוח, מח' תביעות סיעוד, אבא הלל 3, ת.ד. 10952, רמת גן 5252202
-          <br />
-          💻 <strong>אזור אישי:</strong> דרך אתר הראל
+          📮 <strong>דואר (רצוי רשום):</strong> הראל חברה לביטוח, מח' תביעות סיעוד, אבא הלל 3, ת.ד. 10952, רמת גן 5252202
+          <br /><br />
+          <div style={{
+            background: "#E8F5EA",
+            border: "2px solid #6B8F71",
+            borderRadius: "12px",
+            padding: "14px 18px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+          }}>
+            <span style={{ fontSize: "24px" }}>💻</span>
+            <div>
+              <strong style={{ color: "#3D7A42" }}>הגשת תביעת סיעוד מקוונת לחברת הראל (מומלץ!):</strong>
+              <br />
+              <a
+                href="https://tofes101.co.il/forms/harel-long-term-care/submit/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#3D7A42",
+                  fontWeight: 600,
+                  textDecoration: "underline",
+                }}
+              >
+                לחצו כאן להגשת התביעה באופן מקוון ←
+              </a>
+              <br />
+              <span style={{ fontSize: "12px", color: "#6A6A6A" }}>ממלאים פרטים ומעלים מסמכים ישירות מהמחשב או הנייד</span>
+            </div>
+          </div>
         </InfoCard>
 
         <InfoCard icon="📞" title="מה קורה אחרי ההגשה?">
@@ -1479,6 +1696,313 @@ ${report.alwaysRequired.map(r => `
         </InfoCard>
 
         {/* BACK TO START */}
+
+        {/* ===== LAWYER REFERRAL SECTION ===== */}
+        <div style={{
+          background: "linear-gradient(135deg, #F8F4FF 0%, #F0EAFF 100%)",
+          borderRadius: "16px",
+          padding: "28px",
+          marginTop: "28px",
+          border: "2px solid #C8B8E8",
+        }}>
+          <div style={{ textAlign: "center", marginBottom: "16px" }}>
+            <span style={{ fontSize: "36px" }}>⚖️</span>
+            <h3 style={{ fontSize: "19px", fontWeight: 800, color: "#5B4D8A", marginTop: "8px", marginBottom: "6px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+              מעדיפים שעו"ד מומחה יטפל בתביעה עבורכם?
+            </h3>
+            <p style={{ fontSize: "14px", color: "#6A6A6A", lineHeight: "1.7", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+              השאירו פרטים ונחזור אליכם עם המלצה לעו"ד מתמחה בתביעות סיעוד
+              <br />
+              <strong>ללא עלות וללא התחייבות.</strong>
+            </p>
+          </div>
+
+          {referralSent ? (
+            <div style={{ textAlign: "center", padding: "20px" }}>
+              <div style={{ fontSize: "48px", marginBottom: "12px" }}>✅</div>
+              <h4 style={{ fontSize: "17px", fontWeight: 700, color: "#5B4D8A", marginBottom: "8px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                הפרטים נשלחו בהצלחה!
+              </h4>
+              <p style={{ fontSize: "14px", color: "#6A6A6A", lineHeight: "1.7", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                ניצור אתכם קשר בהקדם עם המלצה לעו"ד מתמחה.
+                <br />
+                לביטול או מחיקת הפנייה, פנו אלינו במייל: <strong>caresync4u@gmail.com</strong>
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* PRIVACY DISCLOSURE - חובת יידוע לפי סעיף 11 */}
+              <div style={{
+                background: "#FEFCF8",
+                border: "1px solid #E0D8C8",
+                borderRadius: "12px",
+                padding: "16px",
+                marginBottom: "16px",
+                fontSize: "12px",
+                lineHeight: "1.8",
+                color: "#5A5A5A",
+                fontFamily: "'Noto Sans Hebrew', sans-serif",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "16px" }}>🔒</span>
+                  <strong style={{ fontSize: "13px", color: "#3D3D3D" }}>הודעת פרטיות — יידוע לפי חוק הגנת הפרטיות</strong>
+                </div>
+
+                <strong>מהות הפנייה:</strong> פרטים שתמסרו כאן ישמשו <strong>אך ורק</strong> לצורך הפנייתכם לעו"ד המתמחה בתביעות סיעוד מול חברות ביטוח.
+                <br /><br />
+                <strong>מידע שיועבר:</strong> שמכם, מספר טלפון, סוג התביעה (תפקודית/קוגניטיבית) ומקום מגורים (בית/מוסד) בלבד. פרטים רגישים כגון ת.ז., מידע רפואי מפורט, פרטי בנק או מידע אחר שמילאתם בשאלון <strong>לא יועברו</strong>.
+                <br /><br />
+                <strong>למי יועבר:</strong> המידע יועבר ל-CareSync ומשם לעו"ד שנבחר עבורכם. המידע לא יימכר, לא יועבר לצד שלישי אחר ולא ישמש לדיוור שיווקי.
+                <br /><br />
+                <strong>מסירת המידע היא מרצונכם בלבד</strong> ואינה מהווה תנאי לשימוש בכלי זה. אי-מסירת פרטים תמנע הפנייה לעו"ד בלבד.
+                <br /><br />
+                <strong>זכויותיכם:</strong> בכל עת תוכלו לפנות ל-<strong>caresync4u@gmail.com</strong> כדי לעיין במידע שנאסף עליכם, לבקש תיקונו או מחיקתו. נפעל למילוי בקשתכם תוך 30 יום.
+                <br /><br />
+                <strong>שמירת המידע:</strong> פרטיכם יישמרו באופן מאובטח ויימחקו תוך 90 יום ממועד סיום הטיפול בהפנייה.
+                <br /><br />
+                <button
+                  onClick={() => setShowPrivacyPolicy(!showPrivacyPolicy)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#5B4D8A",
+                    textDecoration: "underline",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontFamily: "'Noto Sans Hebrew', sans-serif",
+                    padding: 0,
+                  }}
+                >
+                  {showPrivacyPolicy ? "הסתר מדיניות פרטיות מלאה ▲" : "מדיניות פרטיות מלאה ▼"}
+                </button>
+
+                {showPrivacyPolicy && (
+                  <div style={{
+                    marginTop: "12px",
+                    paddingTop: "12px",
+                    borderTop: "1px solid #E0D8C8",
+                    fontSize: "11px",
+                    lineHeight: "1.9",
+                  }}>
+                    <strong>מדיניות פרטיות — כלי הליווי להגשת תביעת סיעוד</strong>
+                    <br /><br />
+                    <strong>1. בעל/ת השליטה במידע:</strong> CareSync, דוא"ל: caresync4u@gmail.com
+                    <br />
+                    <strong>2. סוגי מידע שנאסף:</strong> שם מלא, מספר טלפון, כתובת מייל (אם נמסרה), סוג התביעה, מקום מגורים, הערות חופשיות. אין איסוף של ת.ז., מידע רפואי מפורט, פרטי בנק או מידע ביומטרי.
+                    <br />
+                    <strong>3. מטרת האיסוף:</strong> הפנייה לעו"ד מתמחה בתביעות סיעוד בלבד.
+                    <br />
+                    <strong>4. בסיס חוקי:</strong> הסכמה מדעת של נושא המידע (סעיף 1 לחוק הגנת הפרטיות).
+                    <br />
+                    <strong>5. העברת מידע לצד שלישי:</strong> המידע יועבר לעו"ד מתמחים בתביעות סיעוד בלבד, שחתמו על הסכם המחייב אותם לשמור על המידע בהתאם לדין ולמחקו בתום הטיפול.
+                    <br />
+                    <strong>6. תקופת שמירה:</strong> המידע יישמר לתקופה של עד 90 יום ממועד סיום הטיפול בהפנייה, ולאחר מכן יימחק.
+                    <br />
+                    <strong>7. אבטחת מידע:</strong> המידע נשמר בכלים מאובטחים עם הרשאות גישה מוגבלות, בהתאם לתקנות הגנת הפרטיות (אבטחת מידע), התשע"ז-2017.
+                    <br />
+                    <strong>8. זכויות נושא המידע:</strong> זכות עיון (סעיף 13), זכות תיקון (סעיף 14), זכות מחיקה. לשם מימוש זכויותיכם, פנו ל-caresync4u@gmail.com.
+                    <br />
+                    <strong>9. ביטול הסכמה:</strong> ניתן לבטל את ההסכמה בכל עת באמצעות פנייה במייל. ביטול ההסכמה יביא להפסקת הטיפול בהפנייה ולמחיקת המידע.
+                    <br />
+                    <strong>10. הגשת תלונה:</strong> ניתן להגיש תלונה לרשות להגנת הפרטיות: www.gov.il/he/departments/the_privacy_protection_authority
+                  </div>
+                )}
+              </div>
+
+              {/* REFERRAL FORM FIELDS */}
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                  <div>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "#3D3D3D", display: "block", marginBottom: "4px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                      שם מלא *
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={(formData.firstName || "") + " " + (formData.lastName || "")}
+                      style={{
+                        ...inputStyle,
+                        background: "#F0EBE0",
+                        cursor: "default",
+                      }}
+                    />
+                    <div style={{ fontSize: "11px", color: "#8A8A8A", marginTop: "2px" }}>מתוך השאלון</div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "#3D3D3D", display: "block", marginBottom: "4px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                      טלפון *
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.contactMobile || formData.mobile || ""}
+                      style={{
+                        ...inputStyle,
+                        background: "#F0EBE0",
+                        cursor: "default",
+                        direction: "ltr",
+                      }}
+                    />
+                    <div style={{ fontSize: "11px", color: "#8A8A8A", marginTop: "2px" }}>מתוך השאלון</div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                  <div>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "#3D3D3D", display: "block", marginBottom: "4px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                      סוג התביעה
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.claimType === "functional" ? "מוגבלות תפקודית" : formData.claimType === "cognitive" ? "תשישות נפש" : formData.claimType === "both" ? "שניהם" : "לא צוין"}
+                      style={{
+                        ...inputStyle,
+                        background: "#F0EBE0",
+                        cursor: "default",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "13px", fontWeight: 600, color: "#3D3D3D", display: "block", marginBottom: "4px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                      מקום מגורים
+                    </label>
+                    <input
+                      type="text"
+                      readOnly
+                      value={formData.residenceType === "home" ? "בבית" : formData.residenceType === "assisted" ? "דיור מוגן" : formData.residenceType === "nursing" ? "מוסד סיעודי" : "לא צוין"}
+                      style={{
+                        ...inputStyle,
+                        background: "#F0EBE0",
+                        cursor: "default",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#3D3D3D", display: "block", marginBottom: "4px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                    הערות נוספות (אופציונלי)
+                  </label>
+                  <textarea
+                    value={referralNotes}
+                    onChange={(e) => setReferralNotes(e.target.value)}
+                    placeholder="למשל: זמינות לשיחה, שעות מועדפות, שאלות ספציפיות..."
+                    rows={2}
+                    dir="rtl"
+                    style={{
+                      ...inputStyle,
+                      resize: "vertical",
+                      minHeight: "50px",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* CONSENT CHECKBOXES - הסכמה אקטיבית */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  padding: "12px 14px",
+                  background: referralConsent ? "#F0EAFF" : "#FEFCF8",
+                  border: referralConsent ? "2px solid #7B6BA5" : "2px solid #E0D8C8",
+                  borderRadius: "10px",
+                  cursor: "pointer",
+                  marginBottom: "8px",
+                  transition: "all 0.2s",
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={referralConsent}
+                    onChange={(e) => setReferralConsent(e.target.checked)}
+                    style={{ accentColor: "#7B6BA5", marginTop: "3px", width: "18px", height: "18px", flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: "13px", lineHeight: "1.7", color: "#3D3D3D", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                    <strong>קראתי את הודעת הפרטיות ואני מסכים/ה</strong> להעברת שמי, מספר הטלפון שלי, סוג התביעה ומקום המגורים בלבד לצורך הפנייה לעו"ד מתמחה בתביעות סיעוד. ידוע לי שפרטים רגישים אחרים לא יועברו. <strong style={{ color: "#C75B3A" }}>*</strong>
+                  </span>
+                </label>
+
+                <label style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  padding: "12px 14px",
+                  background: referralContactConsent ? "#F0EAFF" : "#FEFCF8",
+                  border: referralContactConsent ? "2px solid #7B6BA5" : "2px solid #E0D8C8",
+                  borderRadius: "10px",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={referralContactConsent}
+                    onChange={(e) => setReferralContactConsent(e.target.checked)}
+                    style={{ accentColor: "#7B6BA5", marginTop: "3px", width: "18px", height: "18px", flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: "13px", lineHeight: "1.7", color: "#3D3D3D", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                    אני מסכים/ה לקבל <strong>יצירת קשר טלפוני</strong> בנושא ההפנייה לעו"ד. <strong style={{ color: "#C75B3A" }}>*</strong>
+                  </span>
+                </label>
+              </div>
+
+              {/* SUBMIT BUTTON */}
+              <div style={{ textAlign: "center" }}>
+                <button
+                  onClick={() => {
+                    if (!referralConsent || !referralContactConsent) {
+                      alert("יש לסמן את שתי תיבות ההסכמה כדי לשלוח את הפנייה.");
+                      return;
+                    }
+                    const name = (formData.firstName || "") + " " + (formData.lastName || "");
+                    const phone = formData.contactMobile || formData.mobile || "";
+                    if (!name.trim() || !phone.trim()) {
+                      alert("חסרים שם או טלפון. אנא חזרו לשלבים הקודמים והשלימו את הפרטים.");
+                      return;
+                    }
+                    // In production: send to your backend / Google Form / email
+                    // For now: simulate success and log to console
+                    const referralData = {
+                      timestamp: new Date().toISOString(),
+                      name: name.trim(),
+                      phone: phone.trim(),
+                      claimType: formData.claimType || "not_specified",
+                      residenceType: formData.residenceType || "not_specified",
+                      notes: referralNotes,
+                      consentGiven: true,
+                      contactConsentGiven: true,
+                    };
+                    console.log("=== REFERRAL DATA (connect to your backend) ===", referralData);
+                    setReferralSent(true);
+                  }}
+                  disabled={!referralConsent || !referralContactConsent}
+                  style={{
+                    padding: "14px 40px",
+                    borderRadius: "12px",
+                    border: "none",
+                    background: (referralConsent && referralContactConsent)
+                      ? "linear-gradient(135deg, #7B6BA5, #5B4D8A)"
+                      : "#D4C9B0",
+                    color: "white",
+                    cursor: (referralConsent && referralContactConsent) ? "pointer" : "not-allowed",
+                    fontSize: "16px",
+                    fontWeight: 700,
+                    fontFamily: "'Noto Sans Hebrew', sans-serif",
+                    boxShadow: (referralConsent && referralContactConsent) ? "0 4px 14px rgba(91,77,138,0.3)" : "none",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  ⚖️ שלחו את הפרטים שלי לעו"ד
+                </button>
+                <p style={{ fontSize: "11px", color: "#AAAAAA", marginTop: "8px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                  ניתן לבטל את ההסכמה ולבקש מחיקת המידע בכל עת — caresync4u@gmail.com
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+
         <div style={{ display: "flex", justifyContent: "center", marginTop: "20px", marginBottom: "8px" }}>
           <button
             onClick={() => {
@@ -1543,7 +2067,7 @@ ${report.alwaysRequired.map(r => `
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet"
       />
-      <style>{`
+      <style>{"
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
@@ -1553,7 +2077,7 @@ ${report.alwaysRequired.map(r => `
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #D4C9B0; border-radius: 3px; }
-      `}</style>
+      "}</style>
 
       <div
         style={{
@@ -1609,7 +2133,7 @@ ${report.alwaysRequired.map(r => `
           <div style={{ background: "#E8E0D0", borderRadius: "4px", height: "6px", overflow: "hidden" }}>
             <div
               style={{
-                width: `${progress}%`,
+                width: "" + (progress) + "%",
                 height: "100%",
                 background: "linear-gradient(90deg, #6B8F71, #8AB592)",
                 borderRadius: "4px",
@@ -1650,6 +2174,67 @@ ${report.alwaysRequired.map(r => `
             padding: "28px",
           }}
         >
+          {/* DRAFT RESUME NOTICE */}
+          {showDraftNotice && currentStep === 0 && (
+            <div style={{
+              background: "linear-gradient(135deg, #EDF5EE, #E0F0E2)",
+              border: "2px solid #6B8F71",
+              borderRadius: "14px",
+              padding: "18px 20px",
+              marginBottom: "20px",
+              animation: "fadeIn 0.4s ease",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                <span style={{ fontSize: "22px" }}>📂</span>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#3D7A42", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                  נמצאה טיוטה שמורה!
+                </h4>
+              </div>
+              <p style={{ fontSize: "13px", color: "#5A5A5A", lineHeight: "1.7", marginBottom: "14px", fontFamily: "'Noto Sans Hebrew', sans-serif" }}>
+                מצאנו נתונים שמילאתם בפעם הקודמת. הנתונים נשמרו בדפדפן שלכם בלבד.
+                <br />
+                אפשר להמשיך מאיפה שעצרתם, או להתחיל מחדש.
+              </p>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => setShowDraftNotice(false)}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "10px",
+                    border: "none",
+                    background: "linear-gradient(135deg, #6B8F71, #5A7D60)",
+                    color: "white",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    fontFamily: "'Noto Sans Hebrew', sans-serif",
+                  }}
+                >
+                  ✓ המשיכו מהטיוטה
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm("למחוק את כל הנתונים שמולאו ולהתחיל מחדש?")) {
+                      clearDraft();
+                    }
+                  }}
+                  style={{
+                    padding: "8px 20px",
+                    borderRadius: "10px",
+                    border: "2px solid #D4C9B0",
+                    background: "transparent",
+                    color: "#6A6A6A",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    fontFamily: "'Noto Sans Hebrew', sans-serif",
+                  }}
+                >
+                  🗑️ התחל מחדש
+                </button>
+              </div>
+            </div>
+          )}
           {renderStepContent()}
         </div>
 
@@ -1685,31 +2270,63 @@ ${report.alwaysRequired.map(r => `
             → הקודם
           </button>
 
-          {/* HOME BUTTON */}
-          {currentStep > 0 && (
+          {/* CENTER BUTTONS: HOME + CLEAR */}
+          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+            {currentStep > 0 && (
+              <button
+                onClick={() => { setCurrentStep(0); if (contentRef.current) contentRef.current.scrollTop = 0; }}
+                title="חזרה לדף הראשון"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #E0D8C8",
+                  background: "transparent",
+                  color: "#6A6A6A",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  fontFamily: "'Noto Sans Hebrew', sans-serif",
+                  fontWeight: 600,
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "#F5F0E8"; e.currentTarget.style.color = "#6B8F71"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#6A6A6A"; }}
+              >
+                🏠 ראשי
+              </button>
+            )}
+            {currentStep > 0 && (
             <button
-              onClick={() => { setCurrentStep(0); if (contentRef.current) contentRef.current.scrollTop = 0; }}
-              title="חזרה לדף הראשון"
+              onClick={() => {
+                if (window.confirm("למחוק את כל הנתונים ולהתחיל מחדש?\nפעולה זו אינה ניתנת לביטול.")) {
+                  clearDraft();
+                }
+              }}
+              title="נקה את כל הנתונים והתחל מחדש"
               style={{
-                padding: "8px 12px",
+                padding: "8px 14px",
                 borderRadius: "10px",
-                border: "1px solid #E0D8C8",
+                border: "1px solid #E8A090",
                 background: "transparent",
-                color: "#8A8A8A",
+                color: "#C75B3A",
                 cursor: "pointer",
-                fontSize: "18px",
+                fontSize: "14px",
                 transition: "all 0.2s",
                 display: "flex",
                 alignItems: "center",
                 gap: "6px",
+                fontFamily: "'Noto Sans Hebrew', sans-serif",
+                fontWeight: 600,
               }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "#F5F0E8"; e.currentTarget.style.color = "#6B8F71"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#8A8A8A"; }}
+              onMouseOver={(e) => { e.currentTarget.style.background = "#FEF3F0"; e.currentTarget.style.borderColor = "#C75B3A"; }}
+              onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#E8A090"; }}
             >
-              🏠
-              <span style={{ fontSize: "12px", fontFamily: "'Noto Sans Hebrew', sans-serif", fontWeight: 600 }}>ראשי</span>
+              🗑️ נקה טופס
             </button>
-          )}
+            )}
+          </div>
 
           <button
             onClick={goNext}
